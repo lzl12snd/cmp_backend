@@ -1,0 +1,12 @@
+*.log
+*.pyc
+venv/
+*.pid
+*.ini
+dist/
+logs/
+media/*
+!media/default_avatar.svg
+run.sh
+typings
+uwsgi.reload

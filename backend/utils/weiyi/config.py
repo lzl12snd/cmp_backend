@@ -1,0 +1,58 @@
+from Cryptodome.PublicKey import RSA
+
+from .crypt import RsaCipher
+
+__all__ = [
+    "WEIYI_API_BASE_URL",
+    "WEIYI_APP_ID",
+    "WEIYI_APP_KEY",
+    "WEIYI_BASE_URL",
+    "WEIYI_CIPHER",
+    "WEIYI_REDIRECT_URI",
+    "WEIYI_SCOPES",
+]
+
+
+WEIYI_RSA_KEY: RSA.RsaKey = RSA.import_key(
+    b"""-----BEGIN RSA PRIVATE KEY-----
+MIICdwIBADANBgkqhkiG9w0BAQEFAASCAmEwggJdAgEAAoGBAKxnfcah4dQbq/ye
+JUyKLTwtezVXPGnhSmBi4+jGG71S8/dRgD2MvJRAsXRgZPRHzF0Hvg3OT1MPN0X3
+s//W3Zsh3wUB5JqvXSeuEV6U5Wmj78SjGBvHGo9YJ3b0Y+brhIwGI9azYnRmbyYC
+bnuQFNb61NAKDXeRlssCEKC7df/5AgMBAAECgYAA6fRTujkm1UkeTkqz7JBi0kbl
+66/cfwVuHCtJgstUDJce4Rkeumen5yCwFXBTjyt5KF8mIy+hqOH9H/WdtJDfwGlM
+F7QvkiZzM0loaH/iGLf6jT4jNFRVxSytNgyhijjEMdAW3iZlOT9LX3aEMxjsgyL5
+X8NDvBojOevkVOKdkQJBAOMdZGpq5Ax9sHkQ4HOc4x0ATwHC6irZRmdA1tGFBpuq
+PPXD6ohhZ+ahVC3cwkC8d4FuXfAOvwv9k1WUXN+nyH0CQQDCVMitrA/++GjPc2Eq
+DwzKFd+6eBaXJC1yj658mCQ3KXCumX0pVhtabgHoZlkPcD3TrkktIEBuaAuQP6cQ
+BGotAkEA1sjmPUoHj9SSP3x5eH0HwFaZYWYPhSRkU6PbRNyUakTuT9LPi9jqpQ8v
+iAv93bEfJ9XTmwKnJNTUMJwV1SJdFQJBAKH8lG8YPxk1LgDG15Z8hxeo1h6UXZhN
+Iskc9cCL/ZwxoekYrpkXWqOtkU+MiO5yjEb4P60q9ipR9lmehX63f10CQAjTpgIl
+5mXfDSnb8cQBq4xJLHyFDjBztPIMLk6BtgHe7r4PBnEHCM2FAK8S0B22UVsStGxU
+BuaNcN0rMNSrxg8=
+-----END RSA PRIVATE KEY-----"""
+)
+
+
+WEIYI_CIPHER = RsaCipher.new(WEIYI_RSA_KEY)
+
+
+WEIYI_APP_ID = "wy16989210704664947"
+WEIYI_APP_KEY = "1e853fc32cc3a5d1e02f78ec10fd7292"
+WEIYI_SCOPES = ["user_base", "user_position"]
+WEIYI_REDIRECT_URI = "https://mall.gamefi01.art/auth/theone/callback"
+
+
+WEIYI_BASE_URL_PROD = "https://theone.art/"
+WEIYI_BASE_URL_DEV = "https://qa.theone.art/"
+
+WEIYI_API_BASE_URL_PROD = "https://api.theone.art/"
+WEIYI_API_BASE_URL_DEV = "https://qa-api.theone.art/"
+
+WEIYI_ENVIRONMENT_IS_DEV: bool = True
+
+if WEIYI_ENVIRONMENT_IS_DEV:
+    WEIYI_BASE_URL = WEIYI_BASE_URL_DEV
+    WEIYI_API_BASE_URL = WEIYI_API_BASE_URL_DEV
+else:
+    WEIYI_BASE_URL = WEIYI_BASE_URL_PROD
+    WEIYI_API_BASE_URL = WEIYI_API_BASE_URL_PROD

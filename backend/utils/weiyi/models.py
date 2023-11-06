@@ -18,7 +18,7 @@ ErrorCode = Union[ErrorCodeGt, ErrorCodeLt]
 class RawResponse(BaseModel):
     code: Literal[200]
     message: str
-    data: str
+    data: str | dict
 
 
 class ErrorResponse(BaseModel):

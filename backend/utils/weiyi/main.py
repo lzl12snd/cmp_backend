@@ -1,10 +1,11 @@
 import base64
+import json
 from typing import TypeVar
 from urllib.parse import urlencode, urljoin
 
 import requests
 from loguru import logger
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 from .crypt import RsaCipher
 from .models import (
@@ -47,18 +48,23 @@ class WeiyiClient:
             raise ValueError(f"请求失败: {response.status_code}")
         try:
             raw_response = RawResponse.parse_raw(response.text)
-            datadata_bytes = base64.b64decode(raw_response.data)
-            data_decrypted = self.cipher.decrypt(datadata_bytes)
-            return model.parse_raw(data_decrypted)
-        except Exception as e:
+            if isinstance(raw_response.data, dict):
+                return model.parse_obj(raw_response.data)
+            if isinstance(raw_response.data, str):
+                datadata_bytes = base64.b64decode(raw_response.data)
+                data_decrypted = self.cipher.decrypt(datadata_bytes)
+                return model.parse_raw(data_decrypted)
+            raise ValueError("data错误")
+        except ValidationError as e:
+            logger.exception(e)
             logger.warning(response.text)
             try:
-                raise ValueError(ErrorResponse.parse_raw(response.text).message)
-            except Exception:
-                pass
-            raise ValueError(f"解析错误: {e}")
+                error_response = ErrorResponse.parse_raw(response.text)
+            except ValidationError:
+                raise ValueError("解析错误")
+            raise ValueError(error_response.message)
 
-    def get_authorization_url(self) -> str:
+    def get_authorization_url(self, debug: bool) -> str:
         """获取授权登录页"""
         params = urlencode(
             {
@@ -68,7 +74,7 @@ class WeiyiClient:
             }
         )
         authorization_url = urljoin(self.base_url, "Authorize")
-        return f"{authorization_url}?{params}"
+        return f"{authorization_url}?{params}" + ("&debug=true" if debug else "")
 
     def get_access_token(self, code: str) -> AccessTokenData:
         """换取访问凭证"""

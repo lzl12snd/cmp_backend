@@ -174,9 +174,11 @@ set_exception_handlers(api_open)
 
 from user.api import router as user_router
 from goods.api import router as goods_router
+from order.api import router as order_router
 
 api.add_router("/", user_router)
 api.add_router("/", goods_router)
+api.add_router("/", order_router)
 
 from back.api_back import router as back_back_router
 

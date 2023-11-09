@@ -1,3 +1,4 @@
+import datetime
 from typing import Generic, List, Literal, TypeAlias, TypeVar, Union
 
 from pydantic import BaseModel, ConstrainedInt, Field
@@ -54,11 +55,10 @@ class UserInfoData(BaseModel):
 
 
 class UserCollection(BaseModel):
-    accessToken: str
-    expires: int
-    refreshToken: str
-    openId: str
-    unionId: str
+    cover: str
+    createTime: datetime.datetime
+    name: str
+    # nftId: int | None
 
 
 UserCollectionListData: TypeAlias = GenericListData[UserCollection]

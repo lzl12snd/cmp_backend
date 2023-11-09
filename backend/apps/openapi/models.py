@@ -14,3 +14,6 @@ class OpenApp(models.Model):
         db_table = f"{DB_PREFIX}_openapi_app"
         verbose_name = "开放应用表"
         verbose_name_plural = verbose_name
+
+    def __str__(self) -> str:
+        return self.name

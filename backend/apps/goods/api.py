@@ -35,7 +35,7 @@ def get_goods_list(request: HttpRequest, page: int = Query(..., description="页
     ```
     """
     sale_time_filter = Q(sale_time_end__isnull=True) | Q(sale_time_end__gt=datetime.datetime.now())
-    queryset = Goods.objects.filter(status=True).filter(sale_time_filter).order_by("-id")
+    queryset = Goods.objects.filter(status=True).filter(sale_time_filter)
     page_queryset = Paginator(queryset, size).page(page)
     data = []
     for i in page_queryset:

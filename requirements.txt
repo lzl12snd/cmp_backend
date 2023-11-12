@@ -21,7 +21,7 @@ loguru
 # hashids
 # multiavatar
 Pillow
-# qrcode
+qrcode
 # python-magic
 pycryptodomex
 hashids

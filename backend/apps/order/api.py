@@ -27,6 +27,8 @@ def post_order_create(
     quantity: int = Body(..., ge=1, description="数量"),
 ):
     user = auth.get_login_user(request)
+    if not user.can_express():
+        return Response.error("未填写收货信息")
 
     with transaction.atomic():
         goods = Goods.objects.filter(id=goods_id).first()
@@ -40,6 +42,10 @@ def post_order_create(
             unit_price=unit_price,
             quantity=quantity,
             total_price=total_price,
+            express_name=user.express_name,
+            express_phone=user.express_phone,
+            express_area=user.express_area,
+            express_address=user.express_address,
         )
         user.change_credits_and_log(
             order_id=order.order_id,

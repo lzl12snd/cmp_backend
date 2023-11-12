@@ -60,7 +60,8 @@ for path in [LOG_DIR, STATIC_ROOT, MEDIA_ROOT, APPS_DIR]:
 
 # DOMAIN_NAME = "43.137.46.100"
 DOMAIN_NAME = "mall.gamefi01.art"
-BASE_URL = f"http://{DOMAIN_NAME}"
+# DOMAIN_NAME = "mall.bigera.games"
+BASE_URL = f"https://{DOMAIN_NAME}"
 
 UWSGI_INI_FILE_NAME = DOMAIN_NAME  # uwsgi配置文件名
 CRONTAB_COMMENT = "cmp"  # django-crontab 注释, 区分不同项目

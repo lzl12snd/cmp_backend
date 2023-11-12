@@ -40,6 +40,8 @@ class CustomJsonEncoder(NinjaJSONEncoder):
             return urljoin(o.storage.base_url, o.name)
         if not USE_TZ and isinstance(o, datetime.datetime):
             return o.strftime("%Y-%m-%d %H:%M:%S")
+        if isinstance(o, datetime.date):
+            return o.strftime("%Y/%m/%d")
         try:
             return super().default(o)
         except TypeError:

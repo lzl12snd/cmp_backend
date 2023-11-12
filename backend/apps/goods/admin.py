@@ -4,4 +4,4 @@ from goods.models import Goods
 
 @admin.register(Goods)
 class GoodsAdmin(admin.ModelAdmin):
-    pass
+    list_display = ("name", "sort", "status", "create_time")

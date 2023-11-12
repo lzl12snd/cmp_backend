@@ -105,7 +105,7 @@ def get_user_credits_list(
     if not user:
         return Response.page_list(data=[], total=0, total_page=1)
 
-    queryset = UserCreditsLog.objects.filter(user=user, app=app).order_by("-id")
+    queryset = UserCreditsLog.objects.filter(user=user, app=app)
     page_queryset = Paginator(queryset, size).page(page)
 
     data = []

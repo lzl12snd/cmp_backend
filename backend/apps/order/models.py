@@ -21,7 +21,7 @@ class Order(models.Model):
     quantity = models.IntegerField(default=0, verbose_name="数量")
     total_price = models.IntegerField(default=0, verbose_name="总价")
     order_id = models.CharField(max_length=150, default=get_goods_order_id, verbose_name="订单号")
-    status = models.SmallIntegerField(default=OrderStatus.PENDING, verbose_name="订单状态")
+    status = models.SmallIntegerField(default=OrderStatus.PENDING, choices=OrderStatus.choices, verbose_name="订单状态")
     express_name = models.CharField(max_length=150, default="", verbose_name="收货人")
     express_phone = models.CharField(max_length=150, default="", verbose_name="收货手机号码")
     express_area = models.CharField(max_length=150, default="", verbose_name="所在地区")
@@ -31,6 +31,7 @@ class Order(models.Model):
         db_table = f"{DB_PREFIX}_order"
         verbose_name = "订单表"
         verbose_name_plural = verbose_name
+        ordering = ["-id"]
 
     @classmethod
     def create(
@@ -40,11 +41,19 @@ class Order(models.Model):
         unit_price: int,
         quantity: int,
         total_price: int,
+        express_name: str,
+        express_phone: str,
+        express_area: str,
+        express_address: str,
     ) -> "Order":
         return cls.objects.create(
             user=user,
             goods=goods,
             unit_price=unit_price,
             quantity=quantity,
-            total_price=unit_price * quantity,
+            total_price=total_price,
+            express_name=express_name,
+            express_phone=express_phone,
+            express_area=express_area,
+            express_address=express_address,
         )

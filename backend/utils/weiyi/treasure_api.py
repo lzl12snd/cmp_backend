@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import requests
 import hashlib
-from pydantic import BaseModel, ConstrainedInt, ValidationError
+from pydantic import BaseModel, ConstrainedInt, ValidationError, Field
 from loguru import logger
+from typing import Literal
 
 # https://www.weiyi.art/help/second/ebb5ab56726e451db01434bd35376420/9fa0f68a891a427aa2437dc702e08049
 
@@ -16,7 +17,7 @@ class TreasureDetail(BaseModel):
     name: str
     commodityUuid: str
     number: int
-    cover: str
+    cover: str = Field(..., repr=False)
     typeMarket: int
     # categoryName: str
     # categoryImage: str
@@ -73,9 +74,9 @@ class TreasureData(BaseModel):
 
 
 class ResponseModel(BaseModel):
-    code: int
+    code: Literal[200]
     message: str
-    data: dict | None
+    data: dict
 
 
 def encode_params(params: dict, key: str) -> str:
@@ -88,7 +89,8 @@ def encode_params(params: dict, key: str) -> str:
 
 def get_user_treasure(phone: str, commodity_name: str | None = None):
     treasure_list: list[TreasureDetail] = []
-    max_page = 10
+    page_size = 10
+    max_page = 50
     now_page = 0
     while True:
         # 参数名	参数值	是否必传	备注
@@ -117,10 +119,7 @@ def get_user_treasure(phone: str, commodity_name: str | None = None):
             raise ValueError(f"请求失败: {response.status_code}")
         try:
             raw = ResponseModel.parse_raw(response.text)
-            if raw.data is None:
-                data = TreasureData(totalCount=0, treasureDetails=[])
-            else:
-                data = TreasureData.parse_obj(raw.data)
+            data = TreasureData.parse_obj(raw.data)
         except ValidationError:
             try:
                 err_resp = ErrorResponse.parse_raw(response.text)
@@ -133,6 +132,8 @@ def get_user_treasure(phone: str, commodity_name: str | None = None):
             break
         treasure_list.extend(data.treasureDetails)
         if len(treasure_list) < 10:
+            break
+        if now_page * page_size == data.totalCount:
             break
         if now_page >= max_page:
             break

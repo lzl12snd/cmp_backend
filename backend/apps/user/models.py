@@ -14,7 +14,7 @@ from ninja.errors import AuthenticationError
 class WeiyiClientUser:
     def __init__(self, user: "User"):
         self.user = user
-        if not isinstance(self.user.weiyi_token, dict):
+        if not self.user.weiyi_token:
             raise AuthenticationError()
         self.token = AccessTokenData.parse_obj(self.user.weiyi_token)
 
@@ -55,19 +55,23 @@ class User(models.Model):
         C = "C"
 
     level = models.CharField(default=LevelChoice.C, max_length=100, choices=LevelChoice.choices, verbose_name="等级")
-    parent: UserSelfForeignKey = models.ForeignKey("self", null=True, blank=True, on_delete=models.SET_NULL)
+    parent: UserSelfForeignKey = models.ForeignKey(
+        "self", null=True, blank=True, on_delete=models.SET_NULL, verbose_name="邀请人"
+    )
     create_time = models.DateTimeField(auto_now_add=True, verbose_name="创建时间")
     phone = models.CharField(max_length=150, unique=True, verbose_name="手机号")
     avatar = models.CharField(max_length=150, default=None, null=True, blank=True, verbose_name="头像")
     credits = models.BigIntegerField(default=0, verbose_name="积分")
 
-    weiyi_token = models.JSONField(default=None, null=True, blank=True, verbose_name="唯艺 access token")
-    weiyi_token_expire_at = models.DateTimeField(default=None, null=True, blank=True, verbose_name="唯艺 access token 过期时间")
+    weiyi_token = models.JSONField(default=None, null=True, blank=True, verbose_name="唯艺登录状态")
+    weiyi_token_expire_at = models.DateTimeField(
+        default=None, null=True, blank=True, verbose_name="唯艺 access token 过期时间"
+    )
 
-    express_name = models.CharField(max_length=150, default="", verbose_name="收货人")
-    express_phone = models.CharField(max_length=150, default="", verbose_name="收货手机号码")
-    express_area = models.CharField(max_length=150, default="", verbose_name="所在地区")
-    express_address = models.CharField(max_length=150, default="", verbose_name="详细地址")
+    express_name = models.CharField(max_length=150, default="", blank=True, verbose_name="收货人")
+    express_phone = models.CharField(max_length=150, default="", blank=True, verbose_name="收货手机号码")
+    express_area = models.CharField(max_length=150, default="", blank=True, verbose_name="所在地区")
+    express_address = models.CharField(max_length=150, default="", blank=True, verbose_name="详细地址")
 
     def __str__(self):
         return self.phone
@@ -77,6 +81,18 @@ class User(models.Model):
         if self.parent is None:
             return None
         return self.parent.parent
+
+    @property
+    def parent_parent_level(self):
+        if self.parent_parent is None:
+            return None
+        return self.parent_parent.level
+
+    @property
+    def parent_level(self):
+        if self.parent is None:
+            return None
+        return self.parent.level
 
     @property
     def phone_mask(self):
@@ -184,6 +200,7 @@ class UserCreditsLog(models.Model):
         constraints = [
             models.UniqueConstraint(fields=["order_id", "app"], name="user_credits_log_order_app_unique"),
         ]
+        ordering = ["-id"]
 
 
 class WeiyiTreasureInfo(models.Model):
@@ -192,6 +209,9 @@ class WeiyiTreasureInfo(models.Model):
     is_gold = models.BooleanField(default=False, verbose_name="是否是金卡")
     is_whitelist = models.BooleanField(default=False, verbose_name="是否是白名单")
     price = models.DecimalField(max_digits=20, decimal_places=2, verbose_name="价格")
+
+    def __str__(self) -> str:
+        return self.name
 
     class Meta(TypedModelMeta):
         db_table = f"{DB_PREFIX}_weiyi_treasure_info"
@@ -212,12 +232,7 @@ class UserWeiyiTreasure(models.Model):
     number = models.IntegerField(verbose_name="编号")
     cover = models.CharField(max_length=1024, verbose_name="图片")
     type_market = models.IntegerField(verbose_name="市场类型", choices=TypeMarketChoice.choices)
-    # TODO 已经返利标记，无价格商品直接跳过
-    # 金-银		0.5
-    # 银-普		0.3
-    # 金-银-普(间接)		0.1
-    # 普-普		0.1
-
+    is_rebate = models.BooleanField(default=False, verbose_name="是否已经返利")
 
     class Meta(TypedModelMeta):
         db_table = f"{DB_PREFIX}_user_weiyi_treasure"
@@ -253,7 +268,7 @@ class UserWeiyiTreasure(models.Model):
                 defaults=defaults,
             )
             if created:
-                return obj, created
+                return obj, True
 
             update_fields = []
             for k, v in defaults.items():

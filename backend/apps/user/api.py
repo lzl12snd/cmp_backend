@@ -1,21 +1,32 @@
+import datetime
+import hashlib
 import json
+import json
+from typing import Literal
 from django.core.paginator import Paginator
 from django.http import HttpRequest
+from django.http import HttpResponse
 from django.db import transaction
 from django.db.models import Sum
 from ninja import Form, Header, Query, Body, Router
 
 from backend.utils.auth import auth
-from backend.settings import REDIS_PREFIX, get_logger
-from backend.utils.hashid_utils import hashid_encode
+from backend.settings import REDIS_PREFIX, get_logger, get_redis_connection
+from backend.utils.hashid_utils import hashid_decode, hashid_encode
 from backend.utils.response_types import Response
+from backend.utils.user_level_update import do_update_user_level
 from backend.utils.weiyi.treasure_api import get_user_treasure
+from backend.utils.weiyi_rebate import do_rebate
 from user.models import User, UserCreditsLog, UserWeiyiTreasure, WeiyiTreasureInfo
 from backend.utils.weiyi import weiyi_client
+from qrcode.image.pil import PilImage
+from qrcode.main import QRCode
+
 
 router = Router(tags=["用户"])
 
 logger = get_logger()
+redis_conn = get_redis_connection()
 
 
 @router.get("wxa/generate/link", summary="获取小程序拉起链接")
@@ -29,6 +40,27 @@ def get_wxa_generate_urllink(
     ```
     """
     return Response.data({"url": "https://wxaurl.cn/pFawq35qbfd"})
+
+
+@router.get("common/qrcode", summary="生成二维码")
+def get_common_qrcode(
+    request: HttpRequest,
+    data: str = Query(..., description="二维码内容", max_length=2048),
+    box_size: int = Query(10, gt=0, le=100),
+    border: int = Query(4, ge=0, le=10),
+):
+    if "inviteCode=undefined" in data:
+        return HttpResponse(status=204)
+    response = HttpResponse(content_type="image/png")
+    qr = QRCode(
+        box_size=box_size,
+        border=border,
+        image_factory=PilImage,
+    )
+    qr.add_data(data)
+    qr.make_image().save(response)
+
+    return response
 
 
 @router.get("weiyi/oauth2/authorize", summary="weiyi oauth2 authorize")
@@ -106,26 +138,34 @@ def get_user_info(request: HttpRequest):
     """
     user = auth.get_login_user(request)
 
-    is_whitelist = (
-        UserWeiyiTreasure.objects.filter(
-            commodity_uuid__in=WeiyiTreasureInfo.objects.filter(
-                is_whitelist=True,
-            ).values_list("commodity_uuid")
+    is_whitelist_key = f"shared:whitelist:{user.phone}"
+    is_whitelist_cache = redis_conn.get(is_whitelist_key)
+    if is_whitelist_cache:
+        is_whitelist = True
+    else:
+        is_whitelist = (
+            UserWeiyiTreasure.objects.filter(
+                commodity_uuid__in=WeiyiTreasureInfo.objects.filter(
+                    is_whitelist=True,
+                ).values_list("commodity_uuid")
+            )
+            .values_list("user", flat=True)
+            .filter(user=user)
+            .exists()
         )
-        .values_list("user", flat=True)
-        .filter(user=user)
-        .exists()
-    )
+        if is_whitelist:
+            redis_conn.set(is_whitelist_key, 1)
 
     rank = User.objects.filter(level=user.level, credits__gte=user.credits).count()
-    total_income = sum(
+    total_income = (
         UserCreditsLog.objects.filter(
             user=user,
             operation=1,
-        )
-        .aggregate(value__sum=Sum("value"))
-        .values()
-    )
+        ).aggregate(
+            value__sum=Sum("value")
+        )["value__sum"]
+    ) or 0
+
     invited_num = User.objects.filter(parent=user).count()
 
     data = {
@@ -143,6 +183,35 @@ def get_user_info(request: HttpRequest):
         "invite_code": hashid_encode(user.id),
     }
     return Response.data(data)
+
+
+@router.post("user/bind/parent", auth=auth.get_auth(), summary="用户绑定邀请人")
+def post_bind_parent(
+    request: HttpRequest,
+    invite_code: str = Body(""),
+    code: str = Body(""),
+):
+    user = auth.get_login_user(request)
+    if user.parent is not None:
+        return Response.error("已绑定邀请人")
+    if user.level == User.LevelChoice.A:
+        return Response.error("不能绑定邀请人")
+
+    invite_code = invite_code or code
+    if not invite_code:
+        return Response.error("邀请码错误")
+    parent_id = hashid_decode(invite_code)
+    parent_user = None
+    if parent_id:
+        parent_user = User.objects.filter(id=parent_id).first()
+    if not parent_user:
+        return Response.error("邀请码错误")
+
+    if parent_user.level == User.LevelChoice.A and user.level == User.LevelChoice.C:
+        user.level = User.LevelChoice.B
+    user.parent = parent_user
+    user.save(update_fields=["parent", "level"])
+    return Response.ok()
 
 
 @router.get("user/express", auth=auth.get_auth(), summary="获取快递信息")
@@ -217,7 +286,8 @@ def get_user_credits_ranking_all(request: HttpRequest):
         ]
         for queryset in querysets
     ]
-    data = dict(zip(levels, datas))
+    data: dict = dict(zip(levels, datas))
+    data["update_time"] = datetime.datetime.now().date()
     return Response.data(data)
 
 
@@ -228,9 +298,10 @@ def post_user_weiyi_check(
     user = auth.get_login_user(request)
     treasures = get_user_treasure(user.phone)
     logger.info(f"treasures {len(treasures)}")
+    has_created = False
     with transaction.atomic():
         for i in treasures:
-            UserWeiyiTreasure.update_or_create(
+            _, created = UserWeiyiTreasure.update_or_create(
                 user=user,
                 commodity_uuid=i.commodityUuid,
                 number=i.number,
@@ -238,4 +309,11 @@ def post_user_weiyi_check(
                 cover=i.cover,
                 type_market=i.typeMarket,
             )
+            if created:
+                has_created = True
+
+    if has_created:
+        do_rebate()
+    do_update_user_level()
+
     return Response.ok()
